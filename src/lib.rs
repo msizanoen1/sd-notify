@@ -30,8 +30,10 @@ use std::io::{self, ErrorKind};
 use std::mem::MaybeUninit;
 #[cfg(feature = "fdstore")]
 use std::os::fd::BorrowedFd;
+use std::os::linux::net::SocketAddrExt;
+use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::RawFd;
-use std::os::unix::net::UnixDatagram;
+use std::os::unix::net::{SocketAddr, UnixDatagram};
 use std::process;
 use std::str::FromStr;
 use std::time::Duration;
@@ -292,7 +294,11 @@ fn borrowed_fd_slice<'a>(s: &'a [BorrowedFd<'_>]) -> &'a [RawFd] {
 
 fn connected_unix_datagram(path: &OsStr) -> io::Result<UnixDatagram> {
     let result = UnixDatagram::unbound()?;
-    result.connect(path)?;
+    if path.as_bytes().starts_with(b"@") {
+        result.connect_addr(&SocketAddr::from_abstract_name(&path.as_bytes()[1..])?)?;
+    } else {
+        result.connect(path)?;
+    }
     Ok(result)
 }
 
